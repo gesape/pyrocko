@@ -60,7 +60,7 @@ def get_mtime(filename):
         raise FileLoadError(e)
 
 
-def iload(filename, segment=None, format='detect', sqirrel=None,
+def iload(filename, segment=None, format='detect', squirrel=None,
           check_mtime=True,
           content=['waveforms', 'stations', 'channels', 'responses']):
 
@@ -70,7 +70,7 @@ def iload(filename, segment=None, format='detect', sqirrel=None,
         mtime = None
 
     if squirrel:
-        old_nuts = squirrel.undig(filename, segment, mtime, want)
+        old_nuts = squirrel.undig(filename, segment, mtime, content)
         if old_nuts:
             db_only_operation = not content or all(
                 nut.kind in content and nut.content_in_db for nut in old_nuts)
@@ -93,10 +93,10 @@ def iload(filename, segment=None, format='detect', sqirrel=None,
     if format not in format_providers:
         raise UnknownFormat(format)
 
-    mod = format_providers[format]
+    mod = format_providers[format][0]
 
     nuts = []
-    for nut in mod.iload(format, filename, segment, mtime, want):
+    for nut in mod.iload(format, filename, segment, mtime, content):
         nuts.append(nut)
         yield nut
 

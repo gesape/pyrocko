@@ -1,10 +1,13 @@
 import numpy as num
 import sqlite3
 
+from pyrocko.guts import Object, String, Timestamp, Float, Int
+
 
 def tsplit(t):
-    seconds = int(num.floor(t))
-    offset = float(t - seconds)
+    seconds = num.floor(t)
+    offset = t - seconds
+    return int(seconds), float(offset)
 
 
 class Nut(Object):
@@ -95,14 +98,16 @@ class Squirrel(object):
         self.conn = sqlite3.connect(':memory:')
         c = self.conn.cursor()
         c.execute(Nut.sql_create_table)
-        c.commit()
+        self.conn.commit()
 
     def add_nut(self, nut):
         c = self.conn.cursor()
         c.execute(Nut.sql_insert, nut.values())
+        self.conn.commit()
 
     def add_nuts(self, filename):
-        for nut, _ in io.iload(filename, format='detect'):
+        from pyrocko.squirrel import io
+        for nut, _ in io.iload(filename, format='detect', content=[]):
             self.add_nut(nut)
 
     def waveform(self, selection=None, **kwargs):
@@ -135,25 +140,25 @@ class Squirrel(object):
     def events(self, selection=None, **kwargs):
         pass
 
+if False:
+    sq = Squirrel()
+    sq.add('/path/to/data')
+#    station = sq.add(Station(...))
+#    waveform = sq.add(Waveform(...))
 
-sq = Squirrel()
-sq.add('/path/to/data')
-station = sq.add(Station(...))
-waveform = sq.add(Waveform(...))
+    sq.remove(station)
 
-sq.remove(station)
-
-stations = sq.stations()
-for waveform in sq.waveforms(stations):
-    resp = sq.response(waveform)
-    resps = sq.responses(waveform)
-    station = sq.station(waveform)
-    channel = sq.channel(waveform)
-    station = sq.station(channel)
-    channels = sq.channels(station)
-    responses = sq.responses(channel)
-    lat, lon = sq.latlon(waveform)
-    lat, lon = sq.latlon(station)
-    dist = sq.distance(station, waveform)
-    azi = sq.azimuth(channel, station)
+    stations = sq.stations()
+    for waveform in sq.waveforms(stations):
+        resp = sq.response(waveform)
+        resps = sq.responses(waveform)
+        station = sq.station(waveform)
+        channel = sq.channel(waveform)
+        station = sq.station(channel)
+        channels = sq.channels(station)
+        responses = sq.responses(channel)
+        lat, lon = sq.latlon(waveform)
+        lat, lon = sq.latlon(station)
+        dist = sq.distance(station, waveform)
+        azi = sq.azimuth(channel, station)
 

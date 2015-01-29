@@ -7,7 +7,7 @@ from pyrocko import squirrel, util
 
 class SquirrelTestCase(unittest.TestCase):
 
-    def testDetect(self):
+    def test_detect(self):
         for (fn, format) in [
                 ('test1.mseed', 'mseed'),
                 ('test2.mseed', 'mseed'),
@@ -19,6 +19,12 @@ class SquirrelTestCase(unittest.TestCase):
 
             fpath = common.test_data_file(fn)
             self.assertEqual(format, squirrel.detect_format(fpath))
+
+    def test_add_nuts(self):
+        sq = squirrel.Squirrel()
+        for fn in ['test1.mseed', 'test2.mseed']:
+            fpath = common.test_data_file(fn)
+            sq.add_nuts(fpath)
 
 
 if __name__ == "__main__":
