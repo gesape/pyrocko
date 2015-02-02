@@ -251,6 +251,17 @@ class Squirrel(object):
         c.execute(Nut.sql_create_table)
         self.conn.commit()
 
+    def dig(self, nuts):
+        c = self.conn.cursor()
+        c.executemany(Nut.sql_insert, [nut.values() for nut in nuts])
+        self.conn.commit()
+
+    def undig(self, filename, segment, mtime, content):
+        sql_select = 'SELECT * FROM nuts WHERE file_name = ? AND file_segment = ?'
+        c = self.conn.cursor()
+        for xx in c.execute(sql_select, (filename, segment)):
+            print xx
+
     def add_nut(self, nut):
         c = self.conn.cursor()
         c.execute(Nut.sql_insert, nut.values())

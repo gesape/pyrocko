@@ -172,7 +172,7 @@ subpacknames = [
     'pyrocko.fdsn',
     'pyrocko.topo',
     'pyrocko.squirrel',
-    'pyrocko.squirrel.io_backends',
+    'pyrocko.squirrel.io',
 ]
 
 

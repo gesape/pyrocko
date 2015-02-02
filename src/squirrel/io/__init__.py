@@ -1,7 +1,7 @@
 import os
 
 from pyrocko.io_common import FileLoadError
-from io_backends import mseed, sac, datacube, stationxml, textfiles
+from pyrocko.squirrel.io import mseed, sac, datacube, stationxml, textfiles
 
 backend_modules = [mseed, sac, datacube, stationxml, textfiles]
 
