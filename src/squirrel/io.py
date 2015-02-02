@@ -62,7 +62,7 @@ def get_mtime(filename):
 
 def iload(filename, segment=None, format='detect', squirrel=None,
           check_mtime=True,
-          content=['waveforms', 'stations', 'channels', 'responses']):
+          content=['waveform', 'station', 'channel', 'response', 'event']):
 
     if check_mtime:
         mtime = get_mtime(filename)

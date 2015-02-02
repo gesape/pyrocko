@@ -1,3 +1,7 @@
+from pyrocko.squirrel import model
+
+km = 1000.
+
 
 def provided_formats():
     return ['sac']
@@ -11,62 +15,121 @@ def detect(first512):
     else:
         return None
 
-def iload(format, filename, segment, mtime, want):
+
+def agg(*ds):
+    out = {}
+    for d in ds:
+        out.update(d)
+
+    return out
+
+
+def nonetoempty(x):
+    if x is None:
+        return x
+    else:
+        return x.strip()
+
+
+def iload(format, filename, segment, mtime, content):
     assert format == 'sac'
 
     from pyrocko import sac
 
-    load_data = 'waveforms' in want
+    load_data = 'waveform' in content
 
     s = sac.SacFile(filename, load_data=load_data)
-    tr = s.to_trace()
-    
-    kwargs = dict(
-        agency=('', 'FDSN')[tr.network != ''],
-        network=tr.network,
-        station=tr.station,
-        location=tr.location,
-        channel=tr.channel,
-        tmin=tr.tmin,
-        tmax=tr.tmax,
+
+    source = dict(
         file_name=filename,
         file_format=format,
         file_segment=0,
         file_mtime=mtime)
 
-    nut = model.Nut(
-        kind='waveform',
-        file_element=0,
-        deltat=tr.deltat,
-        content=(None, tr)['waveforms' in want]
-        **kwargs)
+    codes = dict(
+        network=nonetoempty(s.knetwk),
+        station=nonetoempty(s.kstnm),
+        location=nonetoempty(s.khole),
+        channel=nonetoempty(s.kcmpnm))
+
+    codes['agency'] = ('', 'FDSN')[codes['network'] != '']
+
+    tmin = s.get_ref_time() + s.b
+    tmax = tmin + s.delta * (s.npts-1)
+
+    tspan = dict(
+        tmin=tmin,
+        tmax=tmax,
+        deltat=s.delta)
+
+    inut = 0
+    nut = model.make_waveform_nut(
+        file_element=inut,
+        **agg(codes, tspan, source))
+
+    if 'waveform' in content:
+        nut.content = model.Waveform(
+            data=s.data[0],
+            **nut.waveform_kwargs)
+
+    yield nut
+    inut += 1
 
     if None not in (s.stla, s.stlo):
-        model.Station(
-            tmin=tr.tmin,
-            tmax=tr.tmax,
+        position = dict(
             lat=s.stla,
             lon=s.stlo,
             elevation=s.stel,
             depth=s.stdp)
 
+        nut = model.make_station_nut(
+            file_element=inut,
+            **agg(codes, tspan, source))
+
+        if 'station' in content:
+            nut.content = model.Station(
+                **agg(position, nut.station_kwargs))
+
+        yield nut
+        inut += 1
+
         dip = None
-        if s.inc is not None:
-            dip = s.inc - 90.
+        if s.cmpinc is not None:
+            dip = s.cmpinc - 90.
 
-        model.Channel(
-            tmin=tr.tmin,
-            tmax=tr.tmax,
-            lat=s.stla,
-            lon=s.stlo,
-            elevation=s.stel,
-            depth=s.stdp,
-            azimuth=s.cmpaz,
-            dip=dip)
+        nut = model.make_channel_nut(
+            file_element=inut,
+            **agg(codes, tspan, source))
 
-    model.Event(
-        lat=s.evla,
-        lon=s.evlo,
-        depth=s.evdp*km,
-        magnitude=s.magnitude)
+        if 'channel' in content:
+            nut.content = model.Channel(
+                azimuth=s.cmpaz,
+                dip=dip,
+                **agg(position, nut.channel_kwargs))
 
+        yield nut
+        inut += 1
+
+    if None not in (s.evla, s.evlo, s.o):
+        etime = s.get_ref_time() + s.o
+        depth = None
+        if s.evdp is not None:
+            depth = s.evdp  # * km  #  unclear specs
+
+        nut = model.make_event_nut(
+            file_element=inut,
+            tmin=etime,
+            tmax=etime,
+            **agg(source))
+
+        if 'event' in content:
+            nut.content = model.Event(
+                name=nonetoempty(s.kevnm),
+                lat=s.evla,
+                lon=s.evlo,
+                depth=depth,
+                magnitude=s.mag,
+                **nut.event_kwargs)
+
+        yield nut
+        inut += 1

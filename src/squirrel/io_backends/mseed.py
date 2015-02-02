@@ -1,5 +1,6 @@
 from pyrocko.squirrel import model
 
+
 def provided_formats():
     return ['mseed']
 
@@ -13,12 +14,12 @@ def detect(first512):
         return None
 
 
-def iload(format, filename, segment, mtime, want):
+def iload(format, filename, segment, mtime, content):
     assert format == 'mseed'
 
     from pyrocko import mseed
 
-    load_data = 'waveforms' in want
+    load_data = 'waveform' in content
 
     for itr, tr in enumerate(mseed.iload(filename, load_data=load_data)):
 
@@ -38,4 +39,9 @@ def iload(format, filename, segment, mtime, want):
             file_element=itr,
             file_mtime=mtime)
 
-        yield nut, tr
+        if 'waveform' in content:
+            nut.content = model.Waveform(
+                data=tr.ydata,
+                **nut.waveform_kwargs)
+
+        yield nut
