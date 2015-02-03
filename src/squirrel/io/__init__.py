@@ -1,9 +1,13 @@
 import os
+import logging
 
 from pyrocko.io_common import FileLoadError
 from pyrocko.squirrel.io import mseed, sac, datacube, stationxml, textfiles
 
 backend_modules = [mseed, sac, datacube, stationxml, textfiles]
+
+
+logger = logging.getLogger('pyrocko.sqirrel.io')
 
 
 def update_format_providers():
@@ -76,8 +80,13 @@ def iload(filename, segment=None, format='detect', squirrel=None,
                 nut.kind in content and nut.content_in_db for nut in old_nuts)
 
             if db_only_operation:
+                logger.debug('using cached information for file %s, '
+                             'segment %s' % (filename, segment))
+
                 for nut in old_nuts:
-                    squirrel.undig_content(nut)
+                    if nut.kind in content:
+                        squirrel.undig_content(nut)
+
                     yield nut
 
                 return
@@ -96,6 +105,7 @@ def iload(filename, segment=None, format='detect', squirrel=None,
     mod = format_providers[format][0]
 
     nuts = []
+    logger.debug('reading file %s, segment %s' % (filename, segment))
     for nut in mod.iload(format, filename, segment, mtime, content):
         nuts.append(nut)
         yield nut

@@ -6,6 +6,27 @@ from pyrocko.guts import Object, String, Timestamp, Float, Int, Unicode
 from pyrocko.guts_array import Array
 
 
+def str_or_none(x):
+    if x is None:
+        return None
+    else:
+        return str(x)
+
+
+def float_or_none(x):
+    if x is None:
+        return None
+    else:
+        return float(x)
+
+
+def int_or_none(x):
+    if x is None:
+        return None
+    else:
+        return int(x)
+
+
 def tsplit(t):
     if t is None:
         return None, 0.0
@@ -144,30 +165,76 @@ class Nut(Object):
             tmax_seconds integer,
             tmax_offset float,
             deltat float,
-            file_mtime float,
             file_name text,
             file_segment int,
             file_element int,
-            file_format text)'''
+            file_format text,
+            file_mtime float)'''
+
+    sql_create_index = '''CREATE INDEX nuts_file_name_index ON nuts (
+            file_name)'''
 
     sql_insert = 'INSERT INTO nuts VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
 
-    def __init__(self, **kwargs):
-        for k in ('tmin', 'tmax'):
-            if k in kwargs:
-                seconds, offset = tsplit(kwargs.pop(k))
-                kwargs[k + '_seconds'] = seconds
-                kwargs[k + '_offset'] = offset
+    def __init__(
+            self,
+            kind='',
+            agency='',
+            network=None,
+            station=None,
+            location=None,
+            channel=None,
+            extra=None,
+            tmin_seconds=None,
+            tmin_offset=0.0,
+            tmax_seconds=None,
+            tmax_offset=0.0,
+            deltat=None,
+            file_name=None,
+            file_segment=None,
+            file_element=None,
+            file_format=None,
+            file_mtime=None,
+            tmin=None,
+            tmax=None):
 
-        Object.__init__(self, **kwargs)
+        if tmin is not None:
+            tmin_seconds, tmin_offset = tsplit(tmin)
+
+        if tmax is not None:
+            tmax_seconds, tmax_offset = tsplit(tmax)
+
+        self.kind = str(kind)
+        self.agency = str(agency)
+        self.network = str_or_none(network)
+        self.station = str_or_none(station)
+        self.location = str_or_none(location)
+        self.channel = str_or_none(channel)
+        self.extra = str_or_none(extra)
+        self.tmin_seconds = int_or_none(tmin_seconds)
+        self.tmin_offset = float(tmin_offset)
+        self.tmax_seconds = int_or_none(tmax_seconds)
+        self.tmax_offset = float(tmin_offset)
+        self.deltat = float_or_none(deltat)
+        self.file_name = str_or_none(file_name)
+        self.file_segment = int_or_none(file_segment)
+        self.file_element = int_or_none(file_element)
+        self.file_format = str_or_none(file_format)
+        self.file_mtime = int_or_none(file_mtime)
+        Object.__init__(self, init_props=False)
 
     def values(self):
         return (
             self.kind, self.agency, self.network, self.station, self.location,
             self.channel, self.extra, self.tmin_seconds, self.tmin_offset,
             self.tmax_seconds, self.tmax_offset, self.deltat,
-            self.file_mtime, self.file_name, self.file_segment,
-            self.file_element, self.file_format)
+            self.file_name, self.file_segment,
+            self.file_element, self.file_format, self.file_mtime)
+
+    @classmethod
+    def from_values(cls, values):
+        o = cls(*values)
+        return o
 
     @property
     def tmin(self):
@@ -249,28 +316,46 @@ class Squirrel(object):
         self.conn = sqlite3.connect(':memory:')
         c = self.conn.cursor()
         c.execute(Nut.sql_create_table)
+        c.execute(Nut.sql_create_index)
         self.conn.commit()
+        c.close()
 
     def dig(self, nuts):
         c = self.conn.cursor()
         c.executemany(Nut.sql_insert, [nut.values() for nut in nuts])
         self.conn.commit()
+        c.close()
 
-    def undig(self, filename, segment, mtime, content):
-        sql_select = 'SELECT * FROM nuts WHERE file_name = ? AND file_segment = ?'
-        c = self.conn.cursor()
-        for xx in c.execute(sql_select, (filename, segment)):
-            print xx
+    def undig(self, filename=None, segment=None, mtime=None, content=None):
+        sql_where = []
+        args = []
+        if filename is not None:
+            sql_where.append('file_name = ?')
+            args.append(filename)
+            if segment is not None:
+                sql_where.append('file_segment = ?')
+                args.append(segment)
 
-    def add_nut(self, nut):
-        c = self.conn.cursor()
-        c.execute(Nut.sql_insert, nut.values())
-        self.conn.commit()
+        sql = 'SELECT * FROM nuts WHERE %s' % ' AND '.join(sql_where)
+        nuts = [Nut.from_values(values) for values in
+                self.conn.execute(sql, args)]
 
-    def add_nuts(self, filename):
-        from pyrocko.squirrel import io
-        for nut in io.iload(filename, format='detect', content=[]):
-            self.add_nut(nut)
+        if mtime is None:
+            return nuts
+        else:
+
+            uptodate = [nut for nut in nuts if nut.file_mtime == mtime]
+            if len(uptodate) != len(nuts):
+                sql_where.append('file_mtime != ?')
+                args.append(mtime)
+                sql = 'DELETE FROM nuts WHERE %s' % ' AND '.join(sql_where)
+                self.conn.execute(sql, args)
+                self.conn.commit()
+
+            return uptodate
+
+    def undig_content(self, nut):
+        return None
 
     def waveform(self, selection=None, **kwargs):
         pass
