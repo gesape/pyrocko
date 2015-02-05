@@ -103,9 +103,16 @@ class SquirrelTestCase(unittest.TestCase):
 
         sq.commit()
 
+        t6b = time.time()
+
+        print 'xx'
+        ii = 0
+        for nut in squirrel.iload_many(fns, content=[], squirrel=sq, check_mtime=False):
+            ii += 1
+
         t7 = time.time()
 
-        print 'squirrel', t5 - t4, t6 - t5, t7 - t6
+        print 'squirrel', t5 - t4, t6 - t5, t6b - t6, t7 - t6b
 
 
 
@@ -122,7 +129,6 @@ class SquirrelTestCase(unittest.TestCase):
             #    print x.file_name
             #else:
             #    print x
-            print fn, len(nuts)
 
             ii += 1
 

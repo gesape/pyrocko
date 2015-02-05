@@ -71,6 +71,11 @@ class Squirrel(object):
 
         return uptodate
 
+    def delete_outdated(filename, mtime):
+        sql = 'DELETE FROM nuts WHERE file_name = ? and mtime != ?'
+        self.conn.execute(sql, (filename, mtime))
+        self._need_commit = True
+
     def undig_many(self, filenames):
         self.conn.execute(
             'CREATE TEMP TABLE undig_many (file_name text)')
