@@ -1,5 +1,6 @@
-import numpy as num
 import sqlite3
+
+import numpy as num
 
 from pyrocko import util
 from pyrocko.guts import Object, String, Timestamp, Float, Int, Unicode
@@ -152,7 +153,7 @@ class Nut(Object):
 
     content = Content.T(optional=True)
 
-    sql_create_table = '''CREATE TABLE nuts (
+    sql_columns = '''(
             kind text,
             agency text,
             network text,
@@ -171,10 +172,7 @@ class Nut(Object):
             file_format text,
             file_mtime float)'''
 
-    sql_create_index = '''CREATE INDEX nuts_file_name_index ON nuts (
-            file_name)'''
-
-    sql_insert = 'INSERT INTO nuts VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    sql_placeholders = '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
 
     def __init__(
             self,
@@ -196,31 +194,40 @@ class Nut(Object):
             file_format=None,
             file_mtime=None,
             tmin=None,
-            tmax=None):
+            tmax=None,
+            values_nocheck=None):
 
-        if tmin is not None:
-            tmin_seconds, tmin_offset = tsplit(tmin)
+        if values_nocheck is not None:
+            (self.kind, self.agency, self.network, self.station, self.location,
+             self.channel, self.extra, self.tmin_seconds, self.tmin_offset,
+             self.tmax_seconds, self.tmax_offset, self.deltat, self.file_name,
+             self.file_segment, self.file_element, self.file_format,
+             self.file_mtime) = values_nocheck
+        else:
+            if tmin is not None:
+                tmin_seconds, tmin_offset = tsplit(tmin)
 
-        if tmax is not None:
-            tmax_seconds, tmax_offset = tsplit(tmax)
+            if tmax is not None:
+                tmax_seconds, tmax_offset = tsplit(tmax)
 
-        self.kind = str(kind)
-        self.agency = str(agency)
-        self.network = str_or_none(network)
-        self.station = str_or_none(station)
-        self.location = str_or_none(location)
-        self.channel = str_or_none(channel)
-        self.extra = str_or_none(extra)
-        self.tmin_seconds = int_or_none(tmin_seconds)
-        self.tmin_offset = float(tmin_offset)
-        self.tmax_seconds = int_or_none(tmax_seconds)
-        self.tmax_offset = float(tmin_offset)
-        self.deltat = float_or_none(deltat)
-        self.file_name = str_or_none(file_name)
-        self.file_segment = int_or_none(file_segment)
-        self.file_element = int_or_none(file_element)
-        self.file_format = str_or_none(file_format)
-        self.file_mtime = int_or_none(file_mtime)
+            self.kind = str(kind)
+            self.agency = str(agency)
+            self.network = str_or_none(network)
+            self.station = str_or_none(station)
+            self.location = str_or_none(location)
+            self.channel = str_or_none(channel)
+            self.extra = str_or_none(extra)
+            self.tmin_seconds = int_or_none(tmin_seconds)
+            self.tmin_offset = float(tmin_offset)
+            self.tmax_seconds = int_or_none(tmax_seconds)
+            self.tmax_offset = float(tmin_offset)
+            self.deltat = float_or_none(deltat)
+            self.file_name = str_or_none(file_name)
+            self.file_segment = int_or_none(file_segment)
+            self.file_element = int_or_none(file_element)
+            self.file_format = str_or_none(file_format)
+            self.file_mtime = int_or_none(file_mtime)
+
         Object.__init__(self, init_props=False)
 
     def values(self):
@@ -310,103 +317,4 @@ def make_event_nut(**kwargs):
         kind='event',
         **kwargs)
 
-
-class Squirrel(object):
-    def __init__(self):
-        self.conn = sqlite3.connect(':memory:')
-        c = self.conn.cursor()
-        c.execute(Nut.sql_create_table)
-        c.execute(Nut.sql_create_index)
-        self.conn.commit()
-        c.close()
-
-    def dig(self, nuts):
-        c = self.conn.cursor()
-        c.executemany(Nut.sql_insert, [nut.values() for nut in nuts])
-        self.conn.commit()
-        c.close()
-
-    def undig(self, filename=None, segment=None, mtime=None, content=None):
-        sql_where = []
-        args = []
-        if filename is not None:
-            sql_where.append('file_name = ?')
-            args.append(filename)
-            if segment is not None:
-                sql_where.append('file_segment = ?')
-                args.append(segment)
-
-        sql = 'SELECT * FROM nuts WHERE %s' % ' AND '.join(sql_where)
-        nuts = [Nut.from_values(values) for values in
-                self.conn.execute(sql, args)]
-
-        if mtime is None:
-            return nuts
-        else:
-
-            uptodate = [nut for nut in nuts if nut.file_mtime == mtime]
-            if len(uptodate) != len(nuts):
-                sql_where.append('file_mtime != ?')
-                args.append(mtime)
-                sql = 'DELETE FROM nuts WHERE %s' % ' AND '.join(sql_where)
-                self.conn.execute(sql, args)
-                self.conn.commit()
-
-            return uptodate
-
-    def undig_content(self, nut):
-        return None
-
-    def waveform(self, selection=None, **kwargs):
-        pass
-
-    def waveforms(self, selection=None, **kwargs):
-        pass
-
-    def station(self, selection=None, **kwargs):
-        pass
-
-    def stations(self, selection=None, **kwargs):
-        pass
-
-    def channel(self, selection=None, **kwargs):
-        pass
-
-    def channels(self, selection=None, **kwargs):
-        pass
-
-    def response(self, selection=None, **kwargs):
-        pass
-
-    def responses(self, selection=None, **kwargs):
-        pass
-
-    def event(self, selection=None, **kwargs):
-        pass
-
-    def events(self, selection=None, **kwargs):
-        pass
-
-
-if False:
-    sq = Squirrel()
-    sq.add('/path/to/data')
-#    station = sq.add(Station(...))
-#    waveform = sq.add(Waveform(...))
-
-    sq.remove(station)
-
-    stations = sq.stations()
-    for waveform in sq.waveforms(stations):
-        resp = sq.response(waveform)
-        resps = sq.responses(waveform)
-        station = sq.station(waveform)
-        channel = sq.channel(waveform)
-        station = sq.station(channel)
-        channels = sq.channels(station)
-        responses = sq.responses(channel)
-        lat, lon = sq.latlon(waveform)
-        lat, lon = sq.latlon(station)
-        dist = sq.distance(station, waveform)
-        azi = sq.azimuth(channel, station)
 

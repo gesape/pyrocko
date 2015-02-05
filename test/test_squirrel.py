@@ -52,7 +52,7 @@ class SquirrelTestCase(unittest.TestCase):
         print t3 - t2, t2 - t1
 
     def benchmark_load(self):
-        dir = '/tmp/testdataset'
+        dir = '/tmp/testdataset_b'
         if not os.path.exists(dir):
             common.make_dataset(dir, tinc=36., tlen=1*common.D)
 
@@ -73,42 +73,65 @@ class SquirrelTestCase(unittest.TestCase):
 
             shutil.rmtree(cachedirname)
 
-        fns = util.select_files([dir])
+        fns = sorted(util.select_files([dir]))
 
         t4 = time.time()
         ii = 0
-        sq = squirrel.Squirrel()
+        sq = squirrel.Squirrel('/tmp/squirrel.db')
+
         for fn in fns:
-            for nut in squirrel.iload(fn, content=[], squirrel=sq):
+            for nut in squirrel.iload(fn, content=[], squirrel=sq, commit=False):
                 ii += 1
 
-        print 'x'
+        sq.commit()
 
         t5 = time.time()
         ii = 0
         for fn in fns:
-            for nut in squirrel.iload(fn, content=[], squirrel=sq):
+            for nut in squirrel.iload(fn, content=[], squirrel=sq, commit=False):
                 ii += 1
+
+        sq.commit()
 
         t6 = time.time()
 
         ii = 0
         for fn in fns:
             for nut in squirrel.iload(fn, content=[], squirrel=sq,
-                                      check_mtime=False):
+                                      check_mtime=False, commit=False):
                 ii += 1
 
+        sq.commit()
+
         t7 = time.time()
+
         print 'squirrel', t5 - t4, t6 - t5, t7 - t6
 
+
+
         ii = 0
-        for nut in squirrel.undig():
+        for x in sq.undig_raw():
+            ii += 1
+
+        t8 = time.time()
+
+
+        ii = 0
+        for fn, nuts in sq.undig_many(fns + ['xxx', 'yyy']):
+            #if isinstance(x, squirrel.Nut):
+            #    print x.file_name
+            #else:
+            #    print x
+            print fn, len(nuts)
+
             ii += 1
 
         print ii
 
-        t8 = time.time()
-        print t8 - t7
+        t9 = time.time()
+
+        print t8 - t7, t9 - t8
+
 
 
 

@@ -26,7 +26,7 @@ format_providers = {}
 update_format_providers()
 
 
-def detect_format(filename, mtime=None):
+def detect_format(filename):
     '''Determine file type from first 512 bytes.'''
 
     try:
@@ -65,16 +65,15 @@ def get_mtime(filename):
 
 
 def iload(filename, segment=None, format='detect', squirrel=None,
-          check_mtime=True,
+          check_mtime=True, commit=True,
           content=['waveform', 'station', 'channel', 'response', 'event']):
 
-    if check_mtime:
-        mtime = get_mtime(filename)
-    else:
-        mtime = None
-
+    mtime = None
     if squirrel:
-        old_nuts = squirrel.undig(filename, segment, mtime, content)
+        if check_mtime:
+            mtime = get_mtime(filename)
+
+        old_nuts = squirrel.undig(filename, segment, mtime)
         if old_nuts:
             db_only_operation = not content or all(
                 nut.kind in content and nut.content_in_db for nut in old_nuts)
@@ -97,7 +96,7 @@ def iload(filename, segment=None, format='detect', squirrel=None,
         mtime = get_mtime(filename)
 
     if format == 'detect':
-        format = detect_format(filename, mtime=mtime)
+        format = detect_format(filename)
 
     if format not in format_providers:
         raise UnknownFormat(format)
@@ -112,3 +111,61 @@ def iload(filename, segment=None, format='detect', squirrel=None,
 
     if squirrel:
         squirrel.dig(nuts)
+        if commit:
+            squirrel.commit()
+
+
+def iload_many(
+        filenames, format='detect', squirrel=None, check_mtime=True,
+        content=['waveform', 'station', 'channel', 'response', 'event']):
+
+    for filename, old_nuts in squirrel.undig_many():
+        mtime = None
+        if check_mtime:
+            mtime = get_mtime(filename)
+            mtime_latest = mtime
+        else:
+            if old_nuts:
+                mtime_latest = max(nut.mtime for nut in old_nuts)
+
+        old_nuts_uptodate = [nut for nut in old_nuts if nut.mtime == mtime_latest]
+
+        if len(old_nuts) != len(old_nuts_uptodate):
+            # squirrel.delete_older(filename, mtime)
+            pass
+
+        if old_nuts:
+            db_only_operation = not content or all(
+                nut.kind in content and nut.content_in_db for nut in old_nuts)
+
+            if db_only_operation:
+                logger.debug('using cached information for file %s, '
+                             % filename)
+
+                for nut in old_nuts:
+                    if nut.kind in content:
+                        squirrel.undig_content(nut)
+
+                    yield nut
+
+                next
+
+        if mtime is None:
+            mtime = get_mtime(filename)
+
+        if format == 'detect':
+            format = detect_format(filename)
+
+        
+
+
+
+
+
+
+
+
+
+
+
+
