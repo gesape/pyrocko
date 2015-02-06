@@ -73,7 +73,7 @@ class Squirrel(object):
                   nut.agency, nut.network, nut.station, nut.location,
                   nut.channel, nut.extra, nut.tmin_seconds,
                   nut.tmin_offset, nut.tmax_seconds, nut.tmax_offset,
-                  nut.deltat) for nut in nuts])
+                  nut.deltat) for nut in file_nuts])
 
         self._need_commit = True
         c.close()

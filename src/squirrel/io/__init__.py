@@ -73,6 +73,9 @@ def iload(
         commit=True,
         content=['waveform', 'station', 'channel', 'response', 'event']):
 
+    n_db = 0
+    n_load = 0
+
     if isinstance(filenames, basestring):
         filenames = [filenames]
         few = True
@@ -116,6 +119,7 @@ def iload(
                     if nut.kind in content:
                         squirrel.undig_content(nut)
 
+                    n_db += 1
                     yield nut
 
                 continue
@@ -137,23 +141,25 @@ def iload(
         logger.debug('reading file %s' % filename)
         nuts = []
         for nut in mod.iload(format, filename, segment, content):
-            print filename
-            nut.filename = filename
-            nut.format = format
-            nut.mtime = mtime
+            nut.file_name = filename
+            nut.file_format = format
+            nut.file_mtime = mtime
 
             nuts.append(nut)
+            n_load += 1
             yield nut
 
         if squirrel and nuts != old_nuts:
             if segment is not None:
                 nuts = mod.iload(format, filename, None, [])
                 for nut in nuts:
-                    nut.filename = filename
-                    nut.format = format
-                    nut.mtime = mtime
+                    nut.file_name = filename
+                    nut.file_format = format
+                    nut.file_mtime = mtime
 
             squirrel.dig(nuts)
 
     if squirrel and commit:
         squirrel.commit()
+
+    #print 'from db: %i, from files: %i' % (n_db, n_load)

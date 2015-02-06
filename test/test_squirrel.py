@@ -31,6 +31,7 @@ class SquirrelTestCase(unittest.TestCase):
             fpath = common.test_data_file(fn)
             for nut in squirrel.iload(fpath, content=[]):
                 ii += 1
+        print ii
 
         assert ii == 396
 
