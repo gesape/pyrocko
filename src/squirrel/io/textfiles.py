@@ -1,7 +1,7 @@
 from pyrocko.squirrel import model
 import logging
 
-logger = logging.getLogger('pyrocko.squirrel.io_backends.textfiles')
+logger = logging.getLogger('pyrocko.squirrel.io.textfiles')
 
 
 def provided_formats():
@@ -45,13 +45,7 @@ def float_or_none(s):
         return float(s)
 
 
-def iload(format, filename, segment, mtime, content):
-    source = dict(
-        file_name=filename,
-        file_format=format,
-        file_segment=0,
-        file_mtime=mtime)
-
+def iload(format, filename, segment, content):
     inut = 0
     tmin = None
     tmax = None
@@ -72,14 +66,14 @@ def iload(format, filename, segment, mtime, content):
                     agn = ('', 'FDSN')[net != '']
 
                     nut = model.make_station_nut(
+                        file_segment=0,
                         file_element=inut,
                         agency=agn,
                         network=net,
                         station=sta,
                         location=loc,
                         tmin=tmin,
-                        tmax=tmax,
-                        **source)
+                        tmax=tmax)
 
                     if 'station' in content:
                         nut.content = model.Station(
@@ -107,6 +101,7 @@ def iload(format, filename, segment, mtime, content):
                                         net, sta, loc, cha))
 
                     nut = model.make_channel_nut(
+                        file_segment=0,
                         file_element=inut,
                         agency=agn,
                         network=net,
@@ -114,8 +109,7 @@ def iload(format, filename, segment, mtime, content):
                         location=loc,
                         channel=cha,
                         tmin=tmin,
-                        tmax=tmax,
-                        **source)
+                        tmax=tmax)
 
                     if 'channel' in content:
                         nut.content = model.Channel(

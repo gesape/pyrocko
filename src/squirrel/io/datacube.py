@@ -14,7 +14,7 @@ def detect(first512):
         return None
 
 
-def iload(format, filename, segment, mtime, content):
+def iload(format, filename, segment, content):
     assert format == 'datacube'
 
     from pyrocko import datacube
@@ -24,6 +24,8 @@ def iload(format, filename, segment, mtime, content):
     for itr, tr in enumerate(datacube.iload(filename, load_data=load_data)):
 
         nut = model.Nut(
+            file_segment=0,
+            file_element=itr,
             kind='waveform',
             agency=('', 'FDSN')[tr.network != ''],
             network=tr.network,
@@ -32,12 +34,7 @@ def iload(format, filename, segment, mtime, content):
             channel=tr.channel,
             tmin = tr.tmin,
             tmax = tr.tmax,
-            deltat = tr.deltat,
-            file_name=filename,
-            file_format=format,
-            file_segment=0,
-            file_element=itr,
-            file_mtime=mtime)
+            deltat = tr.deltat)
 
         if 'waveform' in content:
             nut.content = model.Waveform(

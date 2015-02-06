@@ -52,7 +52,7 @@ class SquirrelTestCase(unittest.TestCase):
         print t3 - t2, t2 - t1
 
     def benchmark_load(self):
-        dir = '/tmp/testdataset_b'
+        dir = '/tmp/testdataset_d'
         if not os.path.exists(dir):
             common.make_dataset(dir, tinc=36., tlen=1*common.D)
 
@@ -107,7 +107,7 @@ class SquirrelTestCase(unittest.TestCase):
 
         print 'xx'
         ii = 0
-        for nut in squirrel.iload_many(fns, content=[], squirrel=sq, check_mtime=False):
+        for nut in squirrel.iload(fns, content=[], squirrel=sq, check_mtime=False):
             ii += 1
 
         t7 = time.time()

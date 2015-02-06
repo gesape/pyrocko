@@ -12,69 +12,80 @@ class Squirrel(object):
     def _initialize_db(self):
         c = self.conn.cursor()
         c.execute(
-            'CREATE TABLE IF NOT EXISTS nuts %s' % model.Nut.sql_columns)
+            '''CREATE TABLE IF NOT EXISTS files (
+                file_name text PRIMARY KEY,
+                file_format text,
+                file_mtime float)''')
 
         c.execute(
-            'CREATE INDEX IF NOT EXISTS nuts_file_name_index '
-            'ON nuts (file_name)')
+            '''CREATE TABLE IF NOT EXISTS nuts (
+                file_id int,
+                file_segment int,
+                file_element int,
+                kind text,
+                agency text,
+                network text,
+                station text,
+                location text,
+                channel text,
+                extra text,
+                tmin_seconds integer,
+                tmin_offset float,
+                tmax_seconds integer,
+                tmax_offset float,
+                deltat float,
+                PRIMARY KEY (file_id, file_segment, file_element))''')
 
         c.execute(
-            'CREATE UNIQUE INDEX IF NOT EXISTS nuts_file_element_index '
-            'ON nuts (file_name, file_segment, file_element)')
+            '''CREATE INDEX IF NOT EXISTS nuts_file_id_index
+                ON nuts (file_id)''')
+
+        c.execute(
+            '''CREATE TRIGGER IF NOT EXISTS delete_nuts 
+                BEFORE DELETE ON files FOR EACH ROW
+                BEGIN
+                  DELETE FROM nuts where file_id = old.rowid;
+                END''')
 
         self.conn.commit()
         c.close()
 
     def dig(self, nuts):
-        c = self.conn.cursor()
-        c.executemany(
-            'INSERT OR REPLACE INTO nuts VALUES %s' %
-            model.Nut.sql_placeholders,
-            [nut.values() for nut in nuts])
-
-        c.close()
-        self._need_commit = True
-
-    def undig(self, filename, segment=None, mtime=None):
-        sql_where = []
-        args = []
-        if filename is not None:
-            sql_where.append('file_name = ?')
-            args.append(filename)
-            if segment is not None:
-                sql_where.append('file_segment = ?')
-                args.append(segment)
-
-        if sql_where:
-            sql = 'SELECT * FROM nuts WHERE %s' % ' AND '.join(sql_where)
-        else:
-            sql = 'SELECT * FROM nuts'
-
-        nuts = [model.Nut(values_nocheck=values) for values in
-                self.conn.execute(sql, args)]
-
         if not nuts:
-            return nuts
+            return
 
-        if mtime is None:
-            mtime = max(nut.file_mtime for nut in nuts)
+        c = self.conn.cursor()
+        by_files = {}
+        for nut in nuts:
+            k = nut.file_name, nut.file_format, nut.file_mtime
+            if k not in by_files:
+                by_files[k] = []
 
-        uptodate = [nut for nut in nuts if nut.file_mtime == mtime]
+            by_files[k].append(nut)
 
-        if filename is not None and len(uptodate) != len(nuts):
-            print 'del', filename
-            sql_where.append('file_mtime != ?')
-            args.append(mtime)
-            sql = 'DELETE FROM nuts WHERE %s' % ' AND '.join(sql_where)
-            self.conn.execute(sql, args)
-            self._need_commit = True
+        for k, file_nuts in by_files.iteritems():
+            c.execute('DELETE FROM files WHERE file_name = ?', k[0:1])
+            c.execute('INSERT INTO files VALUES (?,?,?)', k)
+            file_id = c.lastrowid
+            c.executemany(
+                'INSERT INTO nuts VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                [(file_id, nut.file_segment, nut.file_element, nut.kind,
+                  nut.agency, nut.network, nut.station, nut.location,
+                  nut.channel, nut.extra, nut.tmin_seconds,
+                  nut.tmin_offset, nut.tmax_seconds, nut.tmax_offset,
+                  nut.deltat) for nut in nuts])
 
-        return uptodate
-
-    def delete_outdated(filename, mtime):
-        sql = 'DELETE FROM nuts WHERE file_name = ? and mtime != ?'
-        self.conn.execute(sql, (filename, mtime))
         self._need_commit = True
+        c.close()
+
+    def undig(self, filename):
+        sql = '''
+            SELECT * FROM files 
+            LEFT OUTER JOIN nuts ON files.rowid = nuts.file_id
+            WHERE file_name = ?'''
+
+        return [model.Nut(values_nocheck=row)
+                for row in self.conn.execute(sql, (filename,))]
 
     def undig_many(self, filenames):
         self.conn.execute(
@@ -83,13 +94,10 @@ class Squirrel(object):
         self.conn.executemany(
             'INSERT INTO temp.undig_many VALUES (?)', ((s,) for s in filenames))
 
-        #self.conn.commit()
-
-        sql = 'SELECT * FROM nuts NATURAL JOIN temp.undig_many'
-
         sql = '''
             SELECT * FROM temp.undig_many 
-            LEFT OUTER JOIN nuts ON temp.undig_many.file_name = nuts.file_name 
+            LEFT OUTER JOIN files ON temp.undig_many.file_name = files.file_name 
+            LEFT OUTER JOIN nuts ON files.rowid = nuts.file_id
             ORDER BY temp.undig_many.rowid
         '''
 
@@ -100,7 +108,7 @@ class Squirrel(object):
                 yield fn, nuts
                 nuts = []
 
-            if values[13] is not None:
+            if values[1] is not None:
                 nuts.append(model.Nut(values_nocheck=values[1:]))
 
             fn = values[0]
@@ -110,8 +118,6 @@ class Squirrel(object):
 
         self.conn.execute(
             'DROP TABLE temp.undig_many')
-
-        #self.conn.commit()
 
     def commit(self):
         if self._need_commit:

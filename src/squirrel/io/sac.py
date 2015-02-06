@@ -31,7 +31,7 @@ def nonetoempty(x):
         return x.strip()
 
 
-def iload(format, filename, segment, mtime, content):
+def iload(format, filename, segment, content):
     assert format == 'sac'
 
     from pyrocko import sac
@@ -39,12 +39,6 @@ def iload(format, filename, segment, mtime, content):
     load_data = 'waveform' in content
 
     s = sac.SacFile(filename, load_data=load_data)
-
-    source = dict(
-        file_name=filename,
-        file_format=format,
-        file_segment=0,
-        file_mtime=mtime)
 
     codes = dict(
         network=nonetoempty(s.knetwk),
@@ -64,8 +58,9 @@ def iload(format, filename, segment, mtime, content):
 
     inut = 0
     nut = model.make_waveform_nut(
+        file_segment=0,
         file_element=inut,
-        **agg(codes, tspan, source))
+        **agg(codes, tspan))
 
     if 'waveform' in content:
         nut.content = model.Waveform(
@@ -83,8 +78,9 @@ def iload(format, filename, segment, mtime, content):
             depth=s.stdp)
 
         nut = model.make_station_nut(
+            file_segment=0,
             file_element=inut,
-            **agg(codes, tspan, source))
+            **agg(codes, tspan))
 
         if 'station' in content:
             nut.content = model.Station(
@@ -98,8 +94,9 @@ def iload(format, filename, segment, mtime, content):
             dip = s.cmpinc - 90.
 
         nut = model.make_channel_nut(
+            file_segment=0,
             file_element=inut,
-            **agg(codes, tspan, source))
+            **agg(codes, tspan))
 
         if 'channel' in content:
             nut.content = model.Channel(
@@ -117,10 +114,10 @@ def iload(format, filename, segment, mtime, content):
             depth = s.evdp  # * km  #  unclear specs
 
         nut = model.make_event_nut(
+            file_segment=0,
             file_element=inut,
             tmin=etime,
-            tmax=etime,
-            **agg(source))
+            tmax=etime)
 
         if 'event' in content:
             nut.content = model.Event(

@@ -128,6 +128,13 @@ class Event(Content):
 
 
 class Nut(Object):
+    file_name = String.T(optional=True)
+    file_format = String.T(optional=True)
+    file_mtime = Timestamp.T(optional=True)
+
+    file_segment = Int.T(optional=True)
+    file_element = Int.T(optional=True)
+
     kind = String.T()
 
     agency = String.T(default='FDSN', optional=True, help='Agency code (2-5)')
@@ -144,38 +151,15 @@ class Nut(Object):
 
     deltat = Float.T(optional=True)
 
-    file_name = String.T(optional=True)
-    file_segment = Int.T(optional=True)
-    file_element = Int.T(optional=True)
-    file_format = String.T(optional=True)
-
-    file_mtime = Timestamp.T(optional=True)
-
     content = Content.T(optional=True)
-
-    sql_columns = '''(
-            kind text,
-            agency text,
-            network text,
-            station text,
-            location text,
-            channel text,
-            extra text,
-            tmin_seconds integer,
-            tmin_offset float,
-            tmax_seconds integer,
-            tmax_offset float,
-            deltat float,
-            file_name text,
-            file_segment int,
-            file_element int,
-            file_format text,
-            file_mtime float)'''
-
-    sql_placeholders = '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
 
     def __init__(
             self,
+            file_name=None,
+            file_format=None,
+            file_mtime=None,
+            file_segment=None,
+            file_element=None,
             kind='',
             agency='',
             network=None,
@@ -188,21 +172,18 @@ class Nut(Object):
             tmax_seconds=None,
             tmax_offset=0.0,
             deltat=None,
-            file_name=None,
-            file_segment=None,
-            file_element=None,
-            file_format=None,
-            file_mtime=None,
+            content=None,
             tmin=None,
             tmax=None,
             values_nocheck=None):
 
         if values_nocheck is not None:
-            (self.kind, self.agency, self.network, self.station, self.location,
-             self.channel, self.extra, self.tmin_seconds, self.tmin_offset,
-             self.tmax_seconds, self.tmax_offset, self.deltat, self.file_name,
-             self.file_segment, self.file_element, self.file_format,
-             self.file_mtime) = values_nocheck
+            (self.file_name, self.file_format, self.file_mtime, _,
+             self.file_segment, self.file_element, self.kind, self.agency,
+             self.network, self.station, self.location, self.channel,
+             self.extra, self.tmin_seconds, self.tmin_offset,
+             self.tmax_seconds, self.tmax_offset, self.deltat) = values_nocheck
+            self.content = None
         else:
             if tmin is not None:
                 tmin_seconds, tmin_offset = tsplit(tmin)
@@ -227,21 +208,23 @@ class Nut(Object):
             self.file_element = int_or_none(file_element)
             self.file_format = str_or_none(file_format)
             self.file_mtime = int_or_none(file_mtime)
+            self.content = content
 
         Object.__init__(self, init_props=False)
 
-    def values(self):
-        return (
-            self.kind, self.agency, self.network, self.station, self.location,
-            self.channel, self.extra, self.tmin_seconds, self.tmin_offset,
-            self.tmax_seconds, self.tmax_offset, self.deltat,
-            self.file_name, self.file_segment,
-            self.file_element, self.file_format, self.file_mtime)
+    def __eq__(self, other):
+        return (isinstance(other, Nut) and
+                self.equality_values == other.equality_values)
 
-    @classmethod
-    def from_values(cls, values):
-        o = cls(*values)
-        return o
+    def __ne__(self, other):
+        return not (self == other)
+
+    @property
+    def equality_values(self):
+        return (self.file_segment, self.file_element, self.kind,
+            self.agency, self.network, self.station, self.location,
+            self.channel, self.extra, self.tmin_seconds, self.tmin_offset,
+            self.tmax_seconds, self.tmax_offset, self.deltat)
 
     @property
     def tmin(self):

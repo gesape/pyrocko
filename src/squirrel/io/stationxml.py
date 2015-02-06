@@ -15,19 +15,13 @@ def detect(first512):
     return None
 
 
-def iload(format, filename, segment, mtime, content):
+def iload(format, filename, segment, content):
     assert format == 'stationxml'
 
     far_future = time.time() + 20*Y
 
     from pyrocko.fdsn import station as fdsn_station
     value_or_none = fdsn_station.value_or_none
-
-    source = dict(
-        file_name=filename,
-        file_format=format,
-        file_segment=0,
-        file_mtime=mtime)
 
     sx = fdsn_station.load_xml(filename=filename)
 
@@ -45,13 +39,13 @@ def iload(format, filename, segment, mtime, content):
                 tmax = None
 
             nut = model.make_station_nut(
+                file_segment=0,
                 file_element=inut,
                 agency=agn,
                 network=net,
                 station=sta,
                 tmin=tmin,
-                tmax=tmax,
-                **source)
+                tmax=tmax)
 
             if 'station' in content:
                 nut.content = model.Station(
@@ -76,6 +70,7 @@ def iload(format, filename, segment, mtime, content):
                     deltat = 1.0 / channel.sample_rate.value
 
                 nut = model.make_channel_nut(
+                    file_segment=0,
                     file_element=inut,
                     agency=agn,
                     network=net,
@@ -84,8 +79,7 @@ def iload(format, filename, segment, mtime, content):
                     channel=cha,
                     tmin=tmin,
                     tmax=tmax,
-                    deltat=deltat,
-                    **source)
+                    deltat=deltat)
 
                 if 'channel' in content:
                     nut.content = model.Channel(

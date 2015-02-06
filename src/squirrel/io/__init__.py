@@ -64,23 +64,53 @@ def get_mtime(filename):
         raise FileLoadError(e)
 
 
-def iload(filename, segment=None, format='detect', squirrel=None,
-          check_mtime=True, commit=True,
-          content=['waveform', 'station', 'channel', 'response', 'event']):
+def iload(
+        filenames,
+        segment=None,
+        format='detect',
+        squirrel=None,
+        check_mtime=True,
+        commit=True,
+        content=['waveform', 'station', 'channel', 'response', 'event']):
 
-    mtime = None
+    if isinstance(filenames, basestring):
+        filenames = [filenames]
+        few = True
+    else:
+        assert segment is None, \
+            'segment argument can only be used when loading from a single file'
+
+        try:
+            few = len(filenames) < 100
+        except TypeError:
+            few = False
+
     if squirrel:
-        if check_mtime:
-            mtime = get_mtime(filename)
+        if not few:
+            it = squirrel.undig_many(filenames)
+        else:
+            it = ((fn, squirrel.undig(fn)) for fn in filenames)
 
-        old_nuts = squirrel.undig(filename, segment, mtime)
+    else:
+        it = ((fn, []) for fn in filenames)
+
+    for filename, old_nuts in it:
+        mtime = None
+        if check_mtime and old_nuts:
+            mtime = get_mtime(filename)
+            if mtime != old_nuts[0].file_mtime:
+                old_nuts = []
+
+        if segment is not None:
+            old_nuts = [nut for nut in old_nuts if nut.segment == segment]
+
         if old_nuts:
             db_only_operation = not content or all(
                 nut.kind in content and nut.content_in_db for nut in old_nuts)
 
             if db_only_operation:
                 logger.debug('using cached information for file %s, '
-                             'segment %s' % (filename, segment))
+                             % filename)
 
                 for nut in old_nuts:
                     if nut.kind in content:
@@ -88,77 +118,7 @@ def iload(filename, segment=None, format='detect', squirrel=None,
 
                     yield nut
 
-                return
-    else:
-        old_nuts = None
-
-    if mtime is None:
-        mtime = get_mtime(filename)
-
-    if format == 'detect':
-        if old_nuts and old_nuts[0].file_mtime == mtime:
-            format = old_nuts[0].file_format
-        else:
-            format = detect_format(filename)
-
-    if format not in format_providers:
-        raise UnknownFormat(format)
-
-    mod = format_providers[format][0]
-
-    nuts = []
-    logger.debug('reading file %s, segment %s' % (filename, segment))
-    for nut in mod.iload(format, filename, segment, mtime, content):
-        nuts.append(nut)
-        yield nut
-
-    if squirrel:
-        squirrel.dig(nuts)
-        if commit:
-            squirrel.commit()
-
-
-def iload_many(
-        filenames, format='detect', squirrel=None, check_mtime=True, commit=True,
-        content=['waveform', 'station', 'channel', 'response', 'event']):
-
-    if squirrel:
-        it = squirrel.undig_many(filenames)
-    else:
-        it = ((fn, []) for fn in filenames)
-
-    for filename, old_nuts in it:
-        mtime = None
-        
-        if old_nuts:
-            if check_mtime:
-                mtime = get_mtime(filename)
-                mtime_latest = mtime
-            else:
-                if old_nuts:
-                    mtime_latest = max(nut.file_mtime for nut in old_nuts)
-
-            old_nuts_uptodate = [nut for nut in old_nuts if nut.file_mtime == mtime_latest]
-
-            if len(old_nuts) != len(old_nuts_uptodate):
-                print 'del'
-                squirrel.delete_outdated(filename, mtime)
-
-            if old_nuts:
-                db_only_operation = not content or all(
-                    nut.kind in content and nut.content_in_db for nut in old_nuts)
-
-                if db_only_operation:
-                    logger.debug('using cached information for file %s, '
-                                 % filename)
-
-                    for nut in old_nuts:
-                        if nut.kind in content:
-                            squirrel.undig_content(nut)
-
-                        yield nut
-
-                    continue
+                continue
 
         if mtime is None:
             mtime = get_mtime(filename)
@@ -174,28 +134,26 @@ def iload_many(
 
         mod = format_providers[format][0]
 
-        nuts = []
         logger.debug('reading file %s' % filename)
-        for nut in mod.iload(format, filename, None, mtime, content):
+        nuts = []
+        for nut in mod.iload(format, filename, segment, content):
+            print filename
+            nut.filename = filename
+            nut.format = format
+            nut.mtime = mtime
+
             nuts.append(nut)
             yield nut
 
-        if squirrel:
+        if squirrel and nuts != old_nuts:
+            if segment is not None:
+                nuts = mod.iload(format, filename, None, [])
+                for nut in nuts:
+                    nut.filename = filename
+                    nut.format = format
+                    nut.mtime = mtime
+
             squirrel.dig(nuts)
 
-    if commit:
+    if squirrel and commit:
         squirrel.commit()
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
