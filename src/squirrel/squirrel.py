@@ -1,3 +1,4 @@
+import time
 from pyrocko.squirrel import model
 import sqlite3
 
@@ -103,6 +104,8 @@ class Squirrel(object):
 
         nuts = []
         fn = None
+        t0 = time.time()
+        ii = 0
         for values in self.conn.execute(sql):
             if fn is not None and values[0] != fn:
                 yield fn, nuts
@@ -116,18 +119,42 @@ class Squirrel(object):
         if fn is not None:
             yield fn, nuts
 
+        t1 = time.time()
+        print t1 - t0
+
         self.conn.execute(
             'DROP TABLE temp.undig_many')
+
+    def choose(self, filenames):
+        self.conn.execute(
+            'CREATE TEMP TABLE choosen_files (file_name text)')
+
+        self.conn.executemany(
+            'INSERT INTO temp.choosen_files VALUES (?)', ((s,) for s in filenames))
+
+        sql = '''
+            SELECT nuts.rowid FROM temp.choosen_files 
+            INNER JOIN files ON temp.choosen_files.file_name = files.file_name 
+            INNER JOIN nuts ON files.rowid = nuts.file_id
+        '''
+
+        t0 = time.time()
+        ii = 0
+        for values in self.conn.execute(sql):
+            ii += 1
+
+        t1 = time.time()
+        print t1 - t0
+        
+        print ii
+
+        self.conn.execute(
+            'DROP TABLE temp.choosen_files')
 
     def commit(self):
         if self._need_commit:
             self.conn.commit()
             self._need_commit = False
-
-    def undig_raw(self):
-        sql = 'SELECT * FROM nuts'
-        for x in self.conn.execute(sql):
-            yield x
 
     def undig_content(self, nut):
         return None
