@@ -49,6 +49,34 @@ class SquirrelTestCase(unittest.TestCase):
 
         t3 = time.time()
 
+    def test_dig_undig(self):
+        nuts = []
+        for file_name in 'abcde':
+            for file_element in xrange(2):
+                nuts.append(squirrel.Nut(
+                    file_name=file_name,
+                    file_format='test',
+                    file_mtime=0.0,
+                    file_segment=0,
+                    file_element=file_element,
+                    kind='test'))
+
+        sq = squirrel.Squirrel()
+        sq.dig(nuts)
+
+        for file_name in 'abcde':
+            nuts2 = sq.undig(file_name)
+            print len(nuts2)
+            for nut in nuts2:
+                print nut.file_name, nut.file_element
+
+        for fn, nuts2 in sq.undig_many(filenames=['a', 'b']):
+            print fn
+            for nut in nuts2:
+                print nut.file_name, nut.file_element
+        
+
+
     def benchmark_load(self):
         dir = '/tmp/testdataset_d'
         if not os.path.exists(dir):
@@ -79,7 +107,10 @@ class SquirrelTestCase(unittest.TestCase):
 
         t4 = time.time()
         ii = 0
-        sq = squirrel.Squirrel('/tmp/squirrel.db')
+        dbfilename = '/tmp/squirrel.db'
+        if os.path.exists(dbfilename):
+            os.unlink(dbfilename)
+        sq = squirrel.Squirrel(dbfilename)
 
         for nut in squirrel.iload(fns, content=[], squirrel=sq):
             ii += 1

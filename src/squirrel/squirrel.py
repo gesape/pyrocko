@@ -42,7 +42,7 @@ class Squirrel(object):
                 ON nuts (file_id)''')
 
         c.execute(
-            '''CREATE TRIGGER IF NOT EXISTS delete_nuts 
+            '''CREATE TRIGGER IF NOT EXISTS delete_nuts
                 BEFORE DELETE ON files FOR EACH ROW
                 BEGIN
                   DELETE FROM nuts where file_id = old.rowid;
@@ -81,8 +81,8 @@ class Squirrel(object):
 
     def undig(self, filename):
         sql = '''
-            SELECT * FROM files 
-            LEFT OUTER JOIN nuts ON files.rowid = nuts.file_id
+            SELECT *
+            FROM files INNER JOIN nuts ON files.rowid = nuts.file_id
             WHERE file_name = ?'''
 
         return [model.Nut(values_nocheck=row)
@@ -93,12 +93,14 @@ class Squirrel(object):
             'CREATE TEMP TABLE undig_many (file_name text)')
 
         self.conn.executemany(
-            'INSERT INTO temp.undig_many VALUES (?)', ((s,) for s in filenames))
+            'INSERT INTO temp.undig_many VALUES (?)',
+            ((s,) for s in filenames))
 
         sql = '''
-            SELECT * FROM temp.undig_many 
-            LEFT OUTER JOIN files ON temp.undig_many.file_name = files.file_name 
-            LEFT OUTER JOIN nuts ON files.rowid = nuts.file_id
+            SELECT *
+            FROM temp.undig_many
+            INNER JOIN files ON temp.undig_many.file_name = files.file_name
+            INNER JOIN nuts ON files.rowid = nuts.file_id
             ORDER BY temp.undig_many.rowid
         '''
 
@@ -107,16 +109,18 @@ class Squirrel(object):
         t0 = time.time()
         ii = 0
         for values in self.conn.execute(sql):
+            print values
             if fn is not None and values[0] != fn:
+                print 'yy'
                 yield fn, nuts
                 nuts = []
 
-            if values[1] is not None:
-                nuts.append(model.Nut(values_nocheck=values[1:]))
+            nuts.append(model.Nut(values_nocheck=values[1:]))
 
             fn = values[0]
 
         if fn is not None:
+            print 'zz'
             yield fn, nuts
 
         t1 = time.time()
@@ -130,26 +134,45 @@ class Squirrel(object):
             'CREATE TEMP TABLE choosen_files (file_name text)')
 
         self.conn.executemany(
-            'INSERT INTO temp.choosen_files VALUES (?)', ((s,) for s in filenames))
+            'INSERT INTO temp.choosen_files VALUES (?)',
+            ((s,) for s in filenames))
 
-        sql = '''
-            SELECT nuts.rowid FROM temp.choosen_files 
-            INNER JOIN files ON temp.choosen_files.file_name = files.file_name 
+        self.conn.execute(
+            '''CREATE TEMP TABLE choosen_nuts (
+                file_id int,
+                file_segment int,
+                file_element int,
+                kind text,
+                agency text,
+                network text,
+                station text,
+                location text,
+                channel text,
+                extra text,
+                tmin_seconds integer,
+                tmin_offset float,
+                tmax_seconds integer,
+                tmax_offset float,
+                deltat float,
+                PRIMARY KEY (file_id, file_segment, file_element))''')
+
+        sql = '''INSERT INTO temp.choosen_nuts
+            SELECT nuts.* FROM temp.choosen_files
+            INNER JOIN files ON temp.choosen_files.file_name = files.file_name
             INNER JOIN nuts ON files.rowid = nuts.file_id
         '''
 
         t0 = time.time()
-        ii = 0
-        for values in self.conn.execute(sql):
-            ii += 1
+        self.conn.execute(sql)
 
         t1 = time.time()
         print t1 - t0
-        
-        print ii
 
         self.conn.execute(
             'DROP TABLE temp.choosen_files')
+
+        self.conn.execute(
+            'DROP TABLE temp.choosen_nuts')
 
     def commit(self):
         if self._need_commit:
