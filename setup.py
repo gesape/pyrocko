@@ -576,6 +576,7 @@ subpacknames = [
     'pyrocko.dataset',
     'pyrocko.dataset.topo',
     'pyrocko.streaming',
+    'pyrocko.scenario',
 ]
 
 setup(
