@@ -1212,7 +1212,6 @@ class ExplosionSource(SourceWithMagnitude):
                 self.lat, self.lon,
                 points=points,
                 interpolation=self.interpolation)
-            print points, shear_moduli
 
             return float(self.moment / (3. * shear_moduli))
 
