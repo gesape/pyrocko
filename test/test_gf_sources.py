@@ -104,13 +104,13 @@ class GFSourcesTestCase(unittest.TestCase):
             conf = gf.ConfigTypeA(
                 id='empty_regional',
                 source_depth_min=0.,
-                source_depth_max=20*km,
+                source_depth_max=100*km,
                 source_depth_delta=10*km,
                 distance_min=1000*km,
                 distance_max=2000*km,
                 distance_delta=10*km,
                 sample_rate=2.0,
-                earthmodel_1d=cake.load_model('ak135-f-average.l'),
+                earthmodel_1d=cake.load_model('ak135-f-continental.l'),
                 ncomponents=10)
 
             store_dir = mkdtemp(prefix='gfstore')
@@ -190,11 +190,30 @@ class GFSourcesTestCase(unittest.TestCase):
 
     def test_source_with_magnitude(self):
         src = gf.ExplosionSource(
-            depth=5*km,)
+            depth=5*km,
+            magnitude=5.)
         store = self.dummy_store()
 
         src.discretize_basesource(store)
-        src.get_volume_change(store)
+        volume_change = src.get_volume_change(store)
+
+        src2 = gf.ExplosionSource(
+            depth=5*km,
+            volume_change=volume_change)
+
+        src2.discretize_basesource(store)
+        assert abs(src2.magnitude - 5.) < 1e-6
+
+        src3 = gf.ExplosionSource(
+            depth=60*km,
+            volume_change=volume_change)
+
+        src3.discretize_basesource(store)
+
+        src2.depth = 60*km
+        src2.discretize_basesource(store)
+
+        assert abs(src3.magnitude - src2.magnitude) < 1e-6
 
 
 if __name__ == '__main__':
